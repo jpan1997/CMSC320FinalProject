@@ -1,5 +1,5 @@
 ---
-title: "Final Project"
+title: "CMSC320 Final Project"
 output: html_document
 ---
 
@@ -7,64 +7,233 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# Data Science 101
 
-This tutorial will take you through the data science pipeline using an example dataset.
+_Sarah Kang, Justin Pan_  
+_CMSC320 - Spring 2019_  
+_Héctor Corrada Bravo_  
 
-## 1. Data Curation, Parsing, and Management
 
-The first part of the pipeline involves obtaining a dataset and modifying it based on the data you want to study.
+# Introduction
 
-For example, suppose we want to study teenage suicide rates in the United States.
+### Motivation
+This tutorial was created to satisfy the final project requirement of CMSC320 - Introduction to Data Science - offered at the University of Maryland, College Park. In the following investigation, we will explore and analyze what kinds of factors affect suicide rates such that country, year, gender, gdp, etc. Results from this analysis will help social workers and mental health organizations better predict suicide rates, and where and when to focus their preventive measure efforts. We would like to answer the question: What are good predictors of suicide rates?
 
-Here we load a dataset on suicide rates:
+### Outline
+Below is an outline of the contents of this tutorial:  
+(0) We will first get your machine and environment set up to follow this tutorial.  
+(1) In section 1, we will begin our analysis by obtaining and curating the dataset.  
+(2) In section 2, we will perform some exploratory data analysis where we will manipulate the data and visualize it in different ways in order to see trends more clearly.  
+(3) In section 3, we will perform hypothesis testing and linear regression analysis to find the strongest predictors of suicide rates.
+(4) Finally, we will provide some closing remarks about the data analysis performed and give some potential future directions.
+
+### About the Dataset
+The dataset we will use is "Suicide Rates Overview 1985 to 2016", which we found on the Kaggle Database that aggregates data from 4 different sources (United Nations Development Program, World Bank, World Health Organization, and another Kaggle dataset) into one data table. The Kaggle Database is a popular site that people use to find a variety of datasets so its a reliable source. This particular dataset can be found here: https://www.kaggle.com/russellyates88/suicide-rates-overview-1985-to-2016. With 976 votes and 162 existing Kaggle projects based off of it, we know that this dataset has survived the trials of many others before us and so probably will not be too difficult to use for our purposes. More information about the dataset can be found by following the link. Be sure to download this dataset somewhere!
+
+
+
+# 0. Getting Started
+
+Before we begin, let's set up your machine with all the necessary software.  
+This tutorial was created using R version 3.5.2 (Eggshell Igloo) with RStudio version 1.1.463. R can be downloaded here: https://www.r-project.org/ and RStudio can be downloaded here: https://www.rstudio.com/.
+
+The following code segment lists all the packages used in this tutorial so be sure install these packages before beginning.
+
+```{r packages, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+```
+
+
+# 1. Data Curation, Parsing, and Management
+
+### Loading the Dataset
+
+The first part of the pipeline involves obtaining a dataset and loading it into the R environment.  
+Here we load a dataset on suicide rates from the csv file downloaded from the Kaggle database.
 
 ```{r load_data, message=FALSE, warning=FALSE}
-library(tidyverse)
-
 suicide_df <- read_csv("suicide_rates.csv")
 
 suicide_df
 ```
 
-To make the dataframe more manageable, we'll remove some of the columns (aka attributes) that we won't be using in our analysis:
+In this dataset, the entities are one observation of a suicide rate of a particular sex for a particular age group in one country at a particular year. The follow table describes what each of attributes represents
 
-```{r}
+Attribute           | Data Type             | Description
+------------------  | --------------------- | -------------
+country             | Unordered Categorical | Country
+year                | Discrete Numerical    | Year
+sex                 | Unordered Categorical | Sex
+age                 | Ordered Categorical   | Age group (range)
+suicide_no          | Discrete Numerical    | Number of suicides recorded
+population          | Discrete Numerical    | Country Population
+suicides/100k pop   | Continuous Numerical  | Number of suicides per 100,000 people
+country-year        | Unordered Categorical | Country and Year
+HDI for year        | Continuous Numerical  | Human Development Index
+gdp_for_year        | Continuous Numerical  | Gross Domestic Product
+gdp_per_capita      | Continuous Numerical  | Gross Domestic Product per Capita
+generation          | Ordered Categorical   | Generation of the age group
+
+### Tidying the Dataset
+Next, we will clean up the dataset but removing any unnecessary columns and converting the type of any attributes into a more usable type.  
+Upon closer inspective of some columns, we notice that country-year is simply just the concatentation of country and year, so it does not offer any additional information. For our analysis, we are not interested in the absolute number of suicides, only the suicide rate (suicides/100k pop) but we should still include suicides_no and population in case we would like to compute the average suicide rate across all age groups. In addition, HDI (Human Development Index) data is not available for all years of all countries. It is only available for a subset of countries and only at 5 year intervals so will not use this attribute either. Furthermore, the generation attribute is simply just a one-to-one mapping from the age range attribute so it also offers no additional information. The following code segment selects only the attributes that we are interested in and also renames the columns with more intuitive names.
+
+```{r tidy_data}
 suicide_df <- suicide_df %>%
-  select(country, year, sex, age, suicides_no, population, `suicides/100k pop`, generation)
-
-suicide_df
-```
-
-Also, because we are only interested in teenage suicide rates and suicides that occur in the United States, we'll remove all entities with an age outside the 15-24 age range and a country that is not the United States:
-
-```{r}
-suicide_df <- suicide_df %>%
-  filter(age == "15-24 years" & country == "United States")
+  select(country, year, sex, age, suicides_no, population, `suicides/100k pop`, `gdp_for_year ($)`, `gdp_per_capita ($)`) %>%
+  rename(suicide_rate = `suicides/100k pop`) %>%
+  rename(gdp = `gdp_for_year ($)`) %>%
+  rename(gdp_per_capita = `gdp_per_capita ($)`)
 
 suicide_df
 ```
 
 Now we can graph the data to find trends!
 
-## 2. Exploratory Data Analysis
 
-Let's make a scatter plot of suicides/100k population over the years (we'll also differentiate the male suicides from the female suicides):
 
-```{r}
+# 2. Exploratory Data Analysis
+
+### Suicide Rates over Time
+
+First, using the ggplot command, we will make a scatter plot of suicide rates over time to see how global suicide rates have changed over time. In addition, we use color the points based on gender to see if there exists a relationship between gender and suicide rates.
+
+```{r over_time_scatter}
 suicide_df %>%
-  ggplot(mapping=aes(y=`suicides/100k pop`, x=year, color=sex)) +
-  geom_point()
+  ggplot(mapping=aes(y=suicide_rate, x=year, color=sex)) +
+  geom_point() +
+  labs(title="Suicide Rates over Time (Scatter Plot)",
+      x="Year",
+      y="Suicide Rate") +
+  geom_smooth(method=lm)
 ```
 
-From the graph, it is obvious that the male suicide rate is significantly higher than the female suicide rate.  It also seems that the overall suicide rate increases until 1993-1994, then decreases until 2002-2003, and then increases again until 2015.
+Based on this scatterplot, we can see that female suicide rates are consistently generally lower than male suicide rates. However, due to the high density of data points, it is not immediately clear whether there suicide rates change over time so we will try a different kind of representation - boxplots! Boxplots are better for visualization distributions of a continuous variable over a categorial variable. In this case we would like to see how the distribution of suicide rates relate to the year. This next code segment visualizes suicide rates using boxplots. Our hope is that we can get a better sense of how the distribution changes. In order to visualize the data correctly, we need to convert the year to a categorical variable using the factor function. To make the years more readable, the we added another line of code to rotate the x-axis labels vertically.  
 
-## 3. Hypothesis Testing and Machine Learning
+```{r over_time_boxplot}
+suicide_df %>%
+  mutate(year = factor(year)) %>%
+  ggplot(mapping=aes(y=suicide_rate, x=year)) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle=90, vjust=0.5)) +
+  labs(title="Suicide Rates over Time (Box Plot)",
+      x="Year",
+      y="Suicide Rate")
+```
 
-Let's try to fit a model to the data. Fitting models is important because it allows us to make estimates on new data points (in this case, the model would tell us what the expected suicide rates would be in future years).  Here, we see if a linear regression model is an appropriate model:
+This visualization is slightly better than the scatterplot because it informs us that the distibrution of suicide rates is heavily skewed toward higher suicide rates. In other ways, most suicide rates are concentrated in lower rates, but there exists a long tail towards higher suicide rates as indicated by all the outliers. Again, it is difficult to discern the distribution of these outliers since the data is so dense so we will try one more type of visualization - violin plots! Violin plots are similar to boxplots in that they allow us to visualize distributions, but violin plots display the distribution as a curve, which contains more information about the over shape of the distribution, rather than where just the quartiles are. The code to create the violin plot is almost the same except geom_boxplot() is replaced with geom_violin().
+
+```{r over_time_violinplot}
+suicide_df %>%
+  mutate(year = factor(year)) %>%
+  ggplot(mapping=aes(y=suicide_rate, x=year)) +
+  geom_violin() +
+  theme(axis.text.x = element_text(angle=90, vjust=0.5)) +
+  labs(title="Suicide Rates over Time (Violin Plot)",
+      x="Year",
+      y="Suicide Rate")
+```
+
+This gives us an accurate representation of just how skewed the data is and that the skew is relatively consistent across all years. We also see that the shapes of the violin plots stay fairly consistent across all years so year may not be a strong predictor of suicide rate.
+
+### Suicide Rates by Sex
+
+Based on the first scatter plot, we can see that there exists some relationship between sex and suicide rates, but we would like to see the relationship more clearly. So we will create a boxplot to see how suicide rates are distributed based on sex.
+
+```{r over_sex_boxplot}
+suicide_df %>%
+  ggplot(mapping=aes(y=suicide_rate, x=sex)) +
+  geom_boxplot() +
+  labs(title="Suicide Rates by Sex (Box Plot)",
+      x="Sex",
+      y="Suicide Rate")
+```
+
+Based on this scatter plot, we can see that females generally have much lower suicide rates, but both distributions still have a long tail towards higher suicide rates. Thus, we can hypothesize that gender will probably be a strong indicator of suicide rate.
+
+### Suicide Rates by GDP per Capita
+
+Next, we would like to explore how the GDP of the country relates to its suicide rates. A country's GDP per capita is a strong indicator and good metric of a country's socio-economic status. We believe socio-economic status may be significantly related to suicide rates. We will first create a scatter plot of suicide rates vs GDP per capita. We will use GDP per Capita instead of GDP because GDP per capita is normalized based on a country's population and makes comparisons between country's more accurate.
+
+```{r over_gdp_scatter}
+suicide_df %>%
+  ggplot(mapping=aes(y=suicide_rate, x=gdp_per_capita)) +
+  geom_point() +
+  labs(title="Suicide Rates vs GDP per Capita (Scatter Plot)",
+      x="GDP per Capita ($)",
+      y="Suicide Rate") +
+  geom_smooth(method=lm)
+```
+
+Based on this plot, there seems to exist some sort of inverse relationship or negative linear relationship between suicide rate and GDP per Capita. However, there are too many points to see this relationship clearly, so we can instead find the average suicide rate across all age groups and all genders for each country for each year. In the following pipeline, we first use the group_by() command to select which attributes to group the entities by. In this case we want to find the average suicide rate for each country every year so we call group_by() on country and year. Next, we can't just simply find average suicide rate because each suicide rate statistic is based on the suicides_no/population for that particular group so we need to perform a weighted average. To find the true suicide rate, we can find the total population and total number of suicides using the summarize() command. Since the gdp_per_capita is constant across all age groups and genders, we can simply use the mean() function in the summarize() command to preserve that column for later use in plots. Finally, we can use the mutate() command to calculate the suicide rate based on total population and total number of suicides.
+
+```{r average_rate_age_genders}
+suicide_df_average <- suicide_df %>%
+  group_by(country, year) %>%
+  summarize(population=sum(population), suicides_no=sum(suicides_no), gdp_per_capita=mean(gdp_per_capita)) %>%
+  mutate(suicide_rate=suicides_no/population*100000)
+
+suicide_df_average
+```
+
+Now we are ready to visualize the data again using the same pipeline as before.
+
+```{r over_gdp_scatter_2}
+suicide_df_average %>%
+  ggplot(mapping=aes(y=suicide_rate, x=gdp_per_capita)) +
+  geom_point() +
+  labs(title="Average Suicide Rates vs GDP per Capita (Scatter Plot)",
+      x="GDP per Capita ($)",
+      y="Suicide Rate") +
+  geom_smooth(method=lm)
+```
+
+Since there seems to be a highest concentration data near the lower GDP per Capita values, we may be able to obtain a better visualize by taking the log of GDP per Capita. This will spread out the data near lower GDP per Capita values and compress the data near the higher GDP per Capita values. In this next pipeline, we will use the mutate() command to add another column to the table.
+
+```{r log_gdp_per_capita}
+suicide_df_average <- suicide_df_average %>%
+  mutate(log_gdp_per_capita = log(gdp_per_capita))
+
+suicide_df_average
+```
+
+Next, we will try plotting the same scatter plot again to see if this transformation made any difference.
+
+```{r over_gdp_scatter_3}
+suicide_df_average %>%
+  ggplot(mapping=aes(y=suicide_rate, x=log_gdp_per_capita)) +
+  geom_point() +
+  labs(title="Average Suicide Rates vs Log GDP per Capita (Scatter Plot)",
+      x="Log GDP per Capita ($)",
+      y="Suicide Rate") +
+  geom_smooth(method=lm)
+```
+
+Contrary to our initial intuition, there seems to be a slightly positive linear relationship between average suicide rates and GDP per Capita. In other words, countries with higher GDP per Capita are generally associated with higher suicide rates. The log transformation does not seem to be particularly helpful in highlighting any trends in the data.
+
+### Suicide Rates by Age Group
+
+Based on the official website for the American Foundation for Suicide Prevention (https://afsp.org/about-suicide/suicide-statistics/), suicide rates do seem to be related to age group. We would like to see if we can find a similar relationship in our data. To visualize this relationship, we can plot a boxplot to visualize the distribution of suicide rates for each age group. This next code segment performs this visualization for us.
+
+```{r over_age_boxplot}
+suicide_df %>%
+  ggplot(mapping=aes(y=suicide_rate, x=age)) +
+  geom_boxplot() +
+  labs(title="Suicide Rates by Age (Box Plot)",
+      x="Age",
+      y="Suicide Rate")
+```
+
+Overall, it seems that suicide rate generally increases with age. The 75+ age group clearly has the highest suicide rate among all other age groups. We hypothesize that age is a good indicator of suicide rate.
+
+
+# 3. Hypothesis Testing and Linear Regression Analysis
+
+Let's try to fit a model to the data. Fitting models is important because it allows us to make estimates on new data points. In this case, the model would tell us what the expected suicide rates would be for future years based on age, sex, and GDP per capita. Here, we will fit the data to a linear regression model based on year, age, sex, and GDP per capita. 
 
 ```{r}
-suicide_fit <- lm(`suicides/100k pop`~year, data=suicide_df)
+suicide_fit <- lm(formula=suicide_rate ~ year*sex*gdp_per_capita, data=suicide_df)
 
 suicide_fit_stats <- suicide_fit %>%
   broom::tidy()
@@ -77,7 +246,7 @@ Unfortunately, when we only account for the year, a linear regression model is n
 However, let's add in sex as a factor:
 
 ```{r}
-suicide_fit <- lm(`suicides/100k pop`~year+sex, data=suicide_df)
+suicide_fit <- lm(suicide_rate~year+sex, data=suicide_df)
 
 suicide_fit_stats <- suicide_fit %>%
   broom::tidy()
@@ -89,6 +258,8 @@ Here, the p-values are significantly less than 0.05, so we can reject the null h
 
 This shows that holding everything else constant, the number of suicides per 100k population decreases by about 0.11 every year.  Also, holding everything else constant, the number of suicides per 100k population increases by about 15.14 when the sex changes from female to male.
 
-## 4. Conclusions
+
+
+# 4 Conclusions
 
 There are many different trends between various variables that we can observe in any dataframe.  In this suicide rates data in particular, we saw just from a simple scatter plot that teenage male suicide rates are significantly higher than teenage female suicide rates in the United States.
