@@ -228,12 +228,53 @@ suicide_df %>%
 Overall, it seems that suicide rate generally increases with age. The 75+ age group clearly has the highest suicide rate among all other age groups. We hypothesize that age is a good indicator of suicide rate.
 
 
-# 3. Hypothesis Testing and Linear Regression Analysis
 
-Let's try to fit a model to the data. Fitting models is important because it allows us to make estimates on new data points. In this case, the model would tell us what the expected suicide rates would be for future years based on age, sex, and GDP per capita. Here, we will fit the data to a linear regression model based on year, age, sex, and GDP per capita. 
+# 3. Hypothesis Testing
 
-```{r}
-suicide_fit <- lm(formula=suicide_rate ~ year*sex*gdp_per_capita, data=suicide_df)
+Let's try to fit a model to the data. Fitting models is important because it allows us to make estimates on new data points. In this case, the model would tell us what the expected suicide rates would be for future years based on age, sex, and GDP per capita. Here, we will fit the data to a linear regression model based on year, age, sex, and GDP per capita. Since there seems to be a linear relationship between suicide rate and age, it makes sense to convert age from a categorical variable to a numerical variable. This will decrease the number of terms in our model output and make it more simple.
+
+### Convert Age to Numeric Variable
+
+In this next pipline, we will convert age from a categorical variable to a numeric variable. The value we will assign for each age range will be the average age in that age range. For example, we will assign 9.5 to 5-14 years. This makes more sense than just assigning 0,1,2,3,4,5 to each age range because the interval of each age range changes. By taking the average age in the range, we can account for these inconsistent intervals. For 75+ years, we can assume it represents the 75-100 years range, so we will use 87.5 to represent it. We will write a function to handle the conversion from age range strings to a numeric age value called convert_age(). In order to apply this function to all entries, we will use the function mapply which takes in a function and a vector as its input, and outputs another vector whose elements correspond to the result of the function called on each of the input elements. More information about mapply can be found here: https://www.rdocumentation.org/packages/base/versions/3.6.0/topics/mapply.
+
+```{r age_conversion} 
+convert_age <- function(age) {
+  if(age == '5-14 years') {
+    return(9.5);
+  } else if(age == '15-24 years') {
+    return(19.5);
+  } else if(age == '25-34 years') {
+    return (29.5);
+  } else if(age == '34-55 years') {
+    return (44.5);
+  } else if(age == '55-74 years') {
+    return (64.5);
+  } else {
+    return(87.5);
+  }
+}
+
+
+suicide_df_converted_age <- suicide_df %>%
+  mutate(age = mapply(convert_age, suicide_df$age))
+
+suicide_df_converted_age
+```
+
+### Linear Regression
+
+Now that age is a numeric value, we are ready to apply our linear regression analysis. We will begin by applying each predictor one at at time to figure out which are the strongest predictors. We will use the lm() command to create a linear regression model.
+
+```{r linear_regression_year}
+suicide_fit <- lm(formula=suicide_rate ~ year, data=suicide_df_converted_age)
+
+suicide_fit_stats <- suicide_fit %>%
+  broom::tidy()
+
+suicide_fit_stats
+```
+```{r linear_regression_age}
+suicide_fit <- lm(formula=suicide_rate ~ age, data=suicide_df_converted_age)
 
 suicide_fit_stats <- suicide_fit %>%
   broom::tidy()
@@ -241,12 +282,8 @@ suicide_fit_stats <- suicide_fit %>%
 suicide_fit_stats
 ```
 
-Unfortunately, when we only account for the year, a linear regression model is not the best model for this data because the p-value is significantly greater than 0.05 (so we cannot reject the null hypothesis).
-
-However, let's add in sex as a factor:
-
-```{r}
-suicide_fit <- lm(suicide_rate~year+sex, data=suicide_df)
+```{r linear_regression_gdp}
+suicide_fit <- lm(formula=suicide_rate ~ gdp_per_capita, data=suicide_df_converted_age)
 
 suicide_fit_stats <- suicide_fit %>%
   broom::tidy()
@@ -254,12 +291,34 @@ suicide_fit_stats <- suicide_fit %>%
 suicide_fit_stats
 ```
 
-Here, the p-values are significantly less than 0.05, so we can reject the null hypothesis of no relationship between year and sex, and suicide rates.
+```{r linear_regression_sex}
+suicide_fit <- lm(formula=suicide_rate ~ sex, data=suicide_df_converted_age)
 
-This shows that holding everything else constant, the number of suicides per 100k population decreases by about 0.11 every year.  Also, holding everything else constant, the number of suicides per 100k population increases by about 15.14 when the sex changes from female to male.
+suicide_fit_stats <- suicide_fit %>%
+  broom::tidy()
+
+suicide_fit_stats
+```
+
+Based on the p values for all 4 predictors, we can reject the null hypothesis of no relationship for all but gdp_per_capita. This matches our intuition because when we visualized suicide rate vs gdp_per_capita, we saw that the line was fairly flat and the data seemed to be spread out about the line. Next we will combine the remaining 3 predictors to output another linear regression model.
+
+```{r linear_regression_all_3, rows.print=16}
+suicide_fit <- lm(formula=suicide_rate ~ age*sex*year, data=suicide_df_converted_age)
+
+suicide_fit_stats <- suicide_fit %>%
+  broom::tidy()
+
+suicide_fit_stats
+```
+
+Based on the p values in the model, none of the parameters in the model are significantly different from 0 except for age and age:year. This means that even though we have values for the other parameters in the model, they should not be used to make a prediction because we cannot reject the null hypothesis of no relationship. Thus, our final model becomes:
+\[
+SR = -18.98 + 34.03A - 0.0017AY
+\]
+where SR = suicide rate, A = age, and Y = year.
 
 
 
-# 4 Conclusions
+# 4. Conclusions
 
-There are many different trends between various variables that we can observe in any dataframe.  In this suicide rates data in particular, we saw just from a simple scatter plot that teenage male suicide rates are significantly higher than teenage female suicide rates in the United States.
+There are many different trends between various variables that we can observe in any dataframe. In this suicide rates data in particular, we began with 28,000 entries with data over 12 variables. However, through data manipulation/transformations, various vizualizations and linear regression analysis, we are able to parse through the data for relationships and find the best predictors of suicide rate. Based on our findings in this tutorial, we found that age, sex, and year were individually all statisticially significant predictors of suicide rates. However, when combined together into one linear regression model, only 3 of 8 parameters were statistically significant. One important lesson that we can learn from this is that even if many predictors yield a statistically significant relationship, combining them into one linear regression analysis does not necessarily guarantee that all derived parameters will be statistically significant. Since linear regression analysis may not always be enough to tell the full story, it is equally important to perform EDA (exploratory data analysis) to investigate other trends that might exist in the data.
