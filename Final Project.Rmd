@@ -23,11 +23,11 @@ Below is an outline of the contents of this tutorial:
 (0) We will first get your machine and environment set up to follow this tutorial.  
 (1) In section 1, we will begin our analysis by obtaining and curating the dataset.  
 (2) In section 2, we will perform some exploratory data analysis where we will manipulate the data and visualize it in different ways in order to see trends more clearly.  
-(3) In section 3, we will perform hypothesis testing and linear regression analysis to find the strongest predictors of suicide rates.
+(3) In section 3, we will perform hypothesis testing and linear regression analysis to find the strongest predictors of suicide rates.  
 (4) Finally, we will provide some closing remarks about the data analysis performed and give some potential future directions.
 
 ### About the Dataset
-The dataset we will use is "Suicide Rates Overview 1985 to 2016", which we found on the Kaggle Database that aggregates data from 4 different sources (United Nations Development Program, World Bank, World Health Organization, and another Kaggle dataset) into one data table. The Kaggle Database is a popular site that people use to find a variety of datasets so its a reliable source. This particular dataset can be found here: https://www.kaggle.com/russellyates88/suicide-rates-overview-1985-to-2016. With 976 votes and 162 existing Kaggle projects based off of it, we know that this dataset has survived the trials of many others before us and so probably will not be too difficult to use for our purposes. More information about the dataset can be found by following the link. Be sure to download this dataset somewhere!
+The dataset we will use is "Suicide Rates Overview 1985 to 2016", which we found on the Kaggle Database. This dataset aggregates data from 4 different sources (United Nations Development Program, World Bank, World Health Organization, and another Kaggle dataset) into one data table. The Kaggle Database is a popular site that people use to find a variety of datasets so it's a reliable source. This particular dataset can be found here: https://www.kaggle.com/russellyates88/suicide-rates-overview-1985-to-2016. With 976 votes and 162 existing Kaggle projects based off of it, we know that this dataset has survived the trials of many others before us and so probably will not be too difficult to use for our purposes. More information about the dataset can be found by following the link. Be sure to download this dataset somewhere locally!
 
 
 
@@ -58,7 +58,7 @@ suicide_df <- read_csv("suicide_rates.csv")
 suicide_df
 ```
 
-In this dataset, the entities are one observation of a suicide rate of a particular sex for a particular age group in one country at a particular year. The follow table describes what each of attributes represents
+In this dataset, the entities are one observation of a suicide rate of a particular sex for a particular age group in one country at a particular year. The follow table describes what each attribute represents.
 
 Attribute           | Data Type             | Description
 ------------------  | --------------------- | -------------
@@ -109,7 +109,7 @@ suicide_df %>%
   geom_smooth(method=lm)
 ```
 
-Based on this scatterplot, we can see that female suicide rates are consistently generally lower than male suicide rates. However, due to the high density of data points, it is not immediately clear whether there suicide rates change over time so we will try a different kind of representation - boxplots! Boxplots are better for visualization distributions of a continuous variable over a categorial variable. In this case we would like to see how the distribution of suicide rates relate to the year. This next code segment visualizes suicide rates using boxplots. Our hope is that we can get a better sense of how the distribution changes. In order to visualize the data correctly, we need to convert the year to a categorical variable using the factor function. To make the years more readable, the we added another line of code to rotate the x-axis labels vertically.  
+Based on this scatterplot, we can see that female suicide rates are consistently generally lower than male suicide rates. However, due to the high density of data points, it is not immediately clear whether suicide rates change over time so we will try a different kind of representation - boxplots! Boxplots are better for visualizing distributions of a continuous variable over a categorial variable. In this case we would like to see how the distribution of suicide rates relate to the year. This next code segment visualizes suicide rates using boxplots. Our hope is that we can get a better sense of how the distribution changes. In order to visualize the data correctly, we need to convert the year to a categorical variable using the factor function. To make the years more readable, we added another line of code to rotate the x-axis labels vertically.  
 
 ```{r over_time_boxplot}
 suicide_df %>%
@@ -122,7 +122,7 @@ suicide_df %>%
       y="Suicide Rate")
 ```
 
-This visualization is slightly better than the scatterplot because it informs us that the distibrution of suicide rates is heavily skewed toward higher suicide rates. In other ways, most suicide rates are concentrated in lower rates, but there exists a long tail towards higher suicide rates as indicated by all the outliers. Again, it is difficult to discern the distribution of these outliers since the data is so dense so we will try one more type of visualization - violin plots! Violin plots are similar to boxplots in that they allow us to visualize distributions, but violin plots display the distribution as a curve, which contains more information about the over shape of the distribution, rather than where just the quartiles are. The code to create the violin plot is almost the same except geom_boxplot() is replaced with geom_violin().
+This visualization is slightly better than the scatterplot because it informs us that the distibrution of suicide rates is heavily skewed toward higher suicide rates. In other words, most suicide rates are concentrated in lower rates, but there exists a long tail towards higher suicide rates as indicated by all the outliers. Again, it is difficult to discern the distribution of these outliers since the data is so dense so we will try one more type of visualization - violin plots! Violin plots are similar to boxplots in that they allow us to visualize distributions, but violin plots display the distribution as a curve, which contains more information about the overall shape of the distribution, rather than just where the quartiles are. The code to create the violin plot is almost the same except geom_boxplot() is replaced with geom_violin().
 
 ```{r over_time_violinplot}
 suicide_df %>%
@@ -189,7 +189,7 @@ suicide_df_average %>%
   geom_smooth(method=lm)
 ```
 
-Since there seems to be a highest concentration data near the lower GDP per Capita values, we may be able to obtain a better visualize by taking the log of GDP per Capita. This will spread out the data near lower GDP per Capita values and compress the data near the higher GDP per Capita values. In this next pipeline, we will use the mutate() command to add another column to the table.
+Since there seems to be the highest concentration data near the lower GDP per Capita values, we may be able to obtain a better visualize by taking the log of GDP per Capita. This will spread out the data near lower GDP per Capita values and compress the data near the higher GDP per Capita values. In this next pipeline, we will use the mutate() command to add another column to the table.
 
 ```{r log_gdp_per_capita}
 suicide_df_average <- suicide_df_average %>%
@@ -235,7 +235,7 @@ Let's try to fit a model to the data. Fitting models is important because it all
 
 ### Convert Age to Numeric Variable
 
-In this next pipline, we will convert age from a categorical variable to a numeric variable. The value we will assign for each age range will be the average age in that age range. For example, we will assign 9.5 to 5-14 years. This makes more sense than just assigning 0,1,2,3,4,5 to each age range because the interval of each age range changes. By taking the average age in the range, we can account for these inconsistent intervals. For 75+ years, we can assume it represents the 75-100 years range, so we will use 87.5 to represent it. We will write a function to handle the conversion from age range strings to a numeric age value called convert_age(). In order to apply this function to all entries, we will use the function mapply which takes in a function and a vector as its input, and outputs another vector whose elements correspond to the result of the function called on each of the input elements. More information about mapply can be found here: https://www.rdocumentation.org/packages/base/versions/3.6.0/topics/mapply.
+In this next pipeline, we will convert age from a categorical variable to a numeric variable. The value we will assign for each age range will be the average age in that age range. For example, we will assign 9.5 to 5-14 years. This makes more sense than just assigning 0,1,2,3,4,5 to each age range because the interval of each age range changes. By taking the average age in the range, we can account for these inconsistent intervals. For 75+ years, we can assume it represents the 75-100 years range, so we will use 87.5 to represent it. We will write a function to handle the conversion from age range strings to a numeric age value called convert_age(). In order to apply this function to all entries, we will use the function mapply() which takes in a function and a vector as its input, and outputs another vector whose elements correspond to the result of the function called on each of the input elements. More information about mapply can be found here: https://www.rdocumentation.org/packages/base/versions/3.6.0/topics/mapply.
 
 ```{r age_conversion} 
 convert_age <- function(age) {
@@ -321,4 +321,4 @@ where SR = suicide rate, A = age, and Y = year.
 
 # 4. Conclusions
 
-There are many different trends between various variables that we can observe in any dataframe. In this suicide rates data in particular, we began with 28,000 entries with data over 12 variables. However, through data manipulation/transformations, various vizualizations and linear regression analysis, we are able to parse through the data for relationships and find the best predictors of suicide rate. Based on our findings in this tutorial, we found that age, sex, and year were individually all statisticially significant predictors of suicide rates. However, when combined together into one linear regression model, only 3 of 8 parameters were statistically significant. One important lesson that we can learn from this is that even if many predictors yield a statistically significant relationship, combining them into one linear regression analysis does not necessarily guarantee that all derived parameters will be statistically significant. Since linear regression analysis may not always be enough to tell the full story, it is equally important to perform EDA (exploratory data analysis) to investigate other trends that might exist in the data.
+There are many different trends between various variables that we can observe in any dataframe. In this suicide rates data in particular, we began with 28,000 entries with data over 12 variables. However, through data manipulation/transformations, various vizualizations and linear regression analysis, we are able to parse through the data for relationships and find the best predictors of suicide rate. Based on our findings in this tutorial, we found that age, sex, and year were individually all statisticially significant predictors of suicide rates. However, when combined together into one linear regression model, only 3 of 8 parameters were statistically significant. One area for future development would be to explore how HDI relates to suicide rates. We opted to ignore the HDI column because it was incomplete. However, if one could devise a method of filling in this missing data, then the analysis would be fairly straightforward after that. One important lesson that we can learn from this is that even if many predictors yield a statistically significant relationship, combining them into one linear regression analysis does not necessarily guarantee that all derived parameters will be statistically significant. Since linear regression analysis may not always be enough to tell the full story, it is equally important to perform EDA (exploratory data analysis) to investigate other trends that might exist in the data. 
